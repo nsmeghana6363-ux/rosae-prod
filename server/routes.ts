@@ -12,7 +12,7 @@ import {
 } from "@shared/schema";
 import session from "express-session";
 import bcrypt from "bcryptjs";
-import { syncGoogleCalendarToBookings } from "./jobs/sync-google-calendar";
+// Google Calendar integration removed for production deployment
 
 // Receiver: Google Calendar push or custom webhook to create bookings
 // POST /api/webhooks/booking { title, startTime, endTime, theatreName?, guests?, customerName?, phoneNumber? }
@@ -79,68 +79,39 @@ export function registerWebhookRoutes(app: Express) {
   });
 }
 
-// Calendar webhook helper function
-async function createCalendarEvent(booking: Booking) {
-  const startTime = new Date(
-    `${booking.bookingDate}T${booking.timeSlot.split("-")[0]}:00`,
-  );
-  const endTime = new Date(
-    `${booking.bookingDate}T${booking.timeSlot.split("-")[1]}:00`,
-  );
+// Calendar integration disabled for production deployment
 
-  // Include phone number in description if available
-  const phoneInfo = booking.phoneNumber
-    ? ` Phone: ${booking.phoneNumber}.`
-    : "";
-
-  const calendarEvent = {
-    bookingId: booking.id,
-    title: `${booking.theatreName} Booking - ${booking.guests} guests`,
-    description: `Theatre booking for ${booking.guests} guests. Total: ₹${booking.totalAmount}.${phoneInfo} Created by: ${booking.createdBy}`,
-    startTime,
-    endTime,
-    location: booking.theatreName,
-  };
-
-  const created = await storage.createCalendarEvent(calendarEvent);
-
-  // Notify external calendar integration (include phone explicitly)
-  try {
-    await sendWebhookNotification("create", {
-      bookingId: booking.id,
-      eventData: {
-        ...calendarEvent,
-        phoneNumber: booking.phoneNumber || null,
-      },
-    });
-  } catch {}
-
-  return created;
-}
-
-// Webhook endpoint for calendar integration
-async function sendWebhookNotification(action: string, data: any) {
-  // This would integrate with external calendar APIs like Google Calendar
-  // For now, we'll just log the webhook data
-  console.log(`Calendar webhook: ${action}`, data);
-}
+// Calendar webhook integration disabled for production deployment
 
 
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Set up session middleware
-  app.use(
-    session({
-      secret: process.env.SESSION_SECRET || "rosae-dev-secret",
-      resave: false,
-      saveUninitialized: false,
-      cookie: {
-        httpOnly: true,
-        secure: false, // Set to true in production with HTTPS
-        maxAge: 24 * 60 * 60 * 1000, // 24 hours
-      },
-    }),
-  );
+  // Set up session middleware with production-ready store
+  let sessionConfig: any = {
+    secret: process.env.SESSION_SECRET || "rosae-dev-secret",
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production', // Use HTTPS in production
+      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    },
+  };
+
+  // Use PostgreSQL session store in production
+  if (process.env.DATABASE_URL && process.env.NODE_ENV === 'production') {
+    try {
+      const ConnectPgSimple = require('connect-pg-simple')(session);
+      const { Pool } = require('pg');
+      const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+      sessionConfig.store = new ConnectPgSimple({ pool });
+      console.log('Using PostgreSQL session store for production');
+    } catch (error) {
+      console.warn('Failed to set up PostgreSQL session store, using default:', error.message);
+    }
+  }
+
+  app.use(session(sessionConfig));
 
   // Direct login endpoint for testing
   app.get("/api/direct-login", async (req: any, res) => {
@@ -877,15 +848,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Manual Google Calendar sync route (any authenticated user)
+  // Calendar sync endpoint disabled for production deployment
   app.post("/api/calendar/sync", isAuthenticated, async (req: any, res) => {
-    try {
-      const { calendarId, timeMin, timeMax } = req.body || {};
-      const result = await syncGoogleCalendarToBookings({ calendarId, timeMin, timeMax });
-      return res.json({ ok: true, ...result });
-    } catch (e: any) {
-      console.error("manual calendar sync failed", e);
-      return res.status(500).json({ ok: false, message: e?.message || "Sync failed" });
-    }
+    return res.json({ ok: false, message: "Calendar sync disabled for production deployment" });
   });
 
   // Configuration management routes
@@ -1213,13 +1178,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         createdBy: creatorId,
       } as any);
 
-      // Create calendar event
-      try {
-        await createCalendarEvent(booking);
-      } catch (calendarError) {
-        console.error("Failed to create calendar event:", calendarError);
-        // Don't fail the booking creation if calendar fails
-      }
+      // Calendar event creation disabled for production deployment
 
       await storage.logActivity(
         creatorId,

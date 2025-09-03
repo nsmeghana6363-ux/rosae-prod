@@ -34,6 +34,17 @@ export function execRaw(sqlRaw: string) {
 
 // Initialize database tables
 export function initializeDatabase() {
+  // Skip complex migrations for PostgreSQL - handle via proper migrations
+  if (process.env.DATABASE_URL && process.env.NODE_ENV === 'production') {
+    console.log('PostgreSQL detected - skipping SQLite-specific migrations');
+    return;
+  }
+  
+  if (!sqlite) {
+    console.log('No SQLite instance available for initialization');
+    return;
+  }
+  
   // SAFETY: do not drop tables in dev/prod; keep data. Only ensure schema.
   try {
     const info = sqlite.prepare(`PRAGMA table_info(expenses)`).all() as any[];
