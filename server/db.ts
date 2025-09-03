@@ -1,14 +1,35 @@
 import { drizzle } from 'drizzle-orm/better-sqlite3';
+import { drizzle as drizzlePg } from 'drizzle-orm/postgres-js';
 import Database from 'better-sqlite3';
+import postgres from 'postgres';
 import * as schema from "@shared/schema";
 
-// Use SQLite for local development
-const sqlite = new Database('rosae.db');
-export const db = drizzle(sqlite, { schema });
+// Use PostgreSQL in production, SQLite for development
+let db: any;
+let sqlite: Database | null = null;
+
+if (process.env.DATABASE_URL && process.env.NODE_ENV === 'production') {
+  // Production: Use PostgreSQL
+  const client = postgres(process.env.DATABASE_URL);
+  db = drizzlePg(client, { schema });
+  console.log('Using PostgreSQL database for production');
+} else {
+  // Development: Use SQLite
+  sqlite = new Database('rosae.db');
+  db = drizzle(sqlite, { schema });
+  console.log('Using SQLite database for development');
+}
+
+export { db };
 
 // Allow controlled raw execution for maintenance tasks
 export function execRaw(sqlRaw: string) {
-  return sqlite.exec(sqlRaw);
+  if (sqlite) {
+    return sqlite.exec(sqlRaw);
+  } else {
+    console.warn('execRaw not supported in PostgreSQL mode');
+    return null;
+  }
 }
 
 // Initialize database tables
