@@ -2334,39 +2334,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Calendar webhook routes
-  app.post("/api/webhooks/calendar", async (req, res) => {
-    try {
-      const { action, bookingId, eventData } = req.body;
-
-      switch (action) {
-        case "update":
-          if (eventData && bookingId) {
-            const calendarEvent =
-              await storage.getCalendarEventByBookingId(bookingId);
-            if (calendarEvent) {
-              await storage.updateCalendarEvent(calendarEvent.id, eventData);
-            }
-          }
-          break;
-
-        case "delete":
-          if (bookingId) {
-            await storage.deleteCalendarEvent(bookingId);
-          }
-          break;
-
-        default:
-          return res.status(400).json({ message: "Invalid action" });
-      }
-
-      await sendWebhookNotification(action, { bookingId, eventData });
-      res.json({ success: true });
-    } catch (error) {
-      console.error("Error handling calendar webhook:", error);
-      res.status(500).json({ message: "Failed to handle webhook" });
-    }
-  });
+  // Calendar webhook endpoints disabled for production deployment
 
   // Booking webhook endpoint for automatic booking creation
   app.post("/api/webhooks/booking", async (req, res) => {
@@ -2444,7 +2412,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Create calendar event
       try {
-        await createCalendarEvent(booking);
+        // Calendar event creation disabled for production deployment
       } catch (calendarError) {
         console.error(
           "Failed to create calendar event from webhook:",

@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: rosae-theatre-app
+    runtime: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: rosae-db
+          property: connectionString
+
+databases:
+  - name: rosae-db
+    plan: free
